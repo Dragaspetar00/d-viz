@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>AltınTakip — Gram Altın (TRY)</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <img src="/icons/icon.svg" alt="AltınTakip" class="logo" />
+      <h1>AltınTakip</h1>
+    </div>
+    <div class="status">
+      <span id="netStatus" class="badge offline">Offline</span>
+      <span id="swStatus" class="badge">PWA</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Gram Altın (24K) — TRY</h2>
+      <div class="price-row">
+        <div>
+          <div class="price" id="price">—</div>
+          <div class="sub" id="updatedAt">Son güncelleme: —</div>
+        </div>
+        <button id="refreshBtn" class="btn">Yenile</button>
+      </div>
+      <div class="grid">
+        <div class="info">
+          <div class="label">XAUUSD (USD/ons)</div>
+          <div id="xauusd">—</div>
+        </div>
+        <div class="info">
+          <div class="label">USDTRY</div>
+          <div id="usdtry">—</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Fiyat Alarmı (Cihaz içi bildirim)</h2>
+      <div class="alarm-grid">
+        <label>
+          Hedef Fiyat (TRY)
+          <input type="number" id="alarmTarget" placeholder="Örn: 2500" inputmode="decimal" step="0.01" />
+        </label>
+        <label>
+          Yön
+          <select id="alarmDirection">
+            <option value="ABOVE">Üzerine çıkınca</option>
+            <option value="BELOW">Altına inince</option>
+          </select>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="alarmRepeat" checked />
+          Tekrarlı uyar
+        </label>
+        <div class="alarm-actions">
+          <button id="permBtn" class="btn secondary">Bildirim izni</button>
+          <button id="testNotiBtn" class="btn secondary">Test bildirimi</button>
+          <button id="saveAlarmBtn" class="btn primary">Alarmı Kaydet</button>
+          <button id="disableAlarmBtn" class="btn danger">Alarmı Kapat</button>
+        </div>
+      </div>
+      <div id="alarmStatus" class="sub">Alarm: pasif</div>
+    </section>
+
+    <section class="card">
+      <h2>Notlar</h2>
+      <ul class="notes">
+        <li>Veri kaynağı: exchangerate.host (XAUUSD ve USDTRY). Gram 24K hesap: (XAUUSD / 31.1035) × USDTRY</li>
+        <li>Offline: Son bilinen fiyat yerel olarak saklanır ve gösterilir.</li>
+        <li>Bildirimler yerel olarak çalışır; uygulama açıkken tetiklenir.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>© AltınTakip</span>
+    <span id="version">v1.0.0</span>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="./app.js" defer></script>
+</body>
+</html> 
