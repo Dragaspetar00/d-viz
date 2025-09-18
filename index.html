@@ -1,173 +1,712 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0b1220" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>AltınTakip — Gram Altın (TRY)</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="icons/icon.svg" />
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>AltınTakip — PWA</title>
+  <meta name="theme-color" content="#111827" />
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    :root {
+      --bg: #0b1220;         /* dark bg */
+      --bg-soft: #111827;    /* dark soft */
+      --card: #0f172a;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --gold: #fbbf24;
+      --green: #10b981;
+      --red: #ef4444;
+      --border: #1f2937;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --bg-soft: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --gold: #f59e0b;
+      --green: #059669;
+      --red: #dc2626;
+      --border: #e5e7eb;
+    }
+    * { box-sizing: border-box }
+    html, body { height: 100% }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    a { color: var(--gold); text-decoration: none }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: saturate(180%) blur(8px);
+      background: color-mix(in srgb, var(--bg) 85%, transparent);
+      border-bottom: 1px solid var(--border);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px }
+    .row { display: grid; grid-template-columns: 1fr; gap: 12px }
+    @media (min-width: 900px) {
+      .row-2 { grid-template-columns: 1fr 1fr }
+      .row-3 { grid-template-columns: 1fr 1fr 1fr }
+    }
+    .logo { display:flex; gap:10px; align-items:center; font-weight: 700; }
+    .badge { font-size:12px; color: var(--muted); border:1px solid var(--border); padding:2px 8px; border-radius:999px }
+    .btn {
+      background: var(--gold); color: #111827; border: 0; padding: 10px 14px; border-radius: 10px; font-weight: 600; cursor: pointer;
+    }
+    .btn.secondary { background: var(--bg-soft); color: var(--text); border: 1px solid var(--border) }
+    .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border) }
+    .btn.danger { background: var(--red); color: #fff }
+    .btn.small { padding: 6px 10px; border-radius: 8px; font-weight: 600; font-size: 12px }
+    .grid { display: grid; gap: 12px }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px;
+    }
+    .card h3 { margin: 0 0 10px 0; font-size: 16px }
+    .headline { font-size: 22px; font-weight: 700; margin: 6px 0 10px }
+    .muted { color: var(--muted) }
+    .big { font-size: 24px; font-weight: 700 }
+    .num { font-variant-numeric: tabular-nums }
+    .field { display: grid; gap: 6px }
+    .field label { font-size: 12px; color: var(--muted) }
+    .input, select, input[type="datetime-local"] {
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-soft); color: var(--text);
+      outline: none;
+    }
+    .pill { display:inline-flex; align-items:center; gap:6px; padding: 6px 10px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 999px; font-size: 12px }
+    .flex { display:flex; align-items:center; gap: 8px }
+    .space { height: 16px }
+    .divider { height: 1px; background: var(--border); margin: 10px 0 }
+    .table { width: 100%; border-collapse: collapse }
+    .table th, .table td { border-bottom: 1px solid var(--border); padding: 8px; text-align: left; font-size: 14px }
+    .tag { padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700 }
+    .tag.buy { background: color-mix(in srgb, var(--green) 20%, transparent); color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 40%, transparent) }
+    .tag.sell { background: color-mix(in srgb, var(--red) 20%, transparent); color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 40%, transparent) }
+    .ok { color: var(--green) } .bad { color: var(--red) }
+    .advice { display:grid; gap:8px }
+    .advice .item { padding: 10px 12px; border-radius: 12px; border:1px solid var(--border); background: var(--bg-soft); }
+    canvas { width: 100%; height: 130px; display:block }
+    footer { text-align:center; color: var(--muted); padding: 32px 0 }
+  </style>
 </head>
 <body>
-  <header class="app-header">
-    <div class="brand">
-      <img src="icons/icon.svg" alt="AltınTakip" class="logo" />
-      <h1>AltınTakip</h1>
-    </div>
-    <div class="status">
-      <span id="netStatus" class="badge offline">Offline</span>
-      <span id="swStatus" class="badge">PWA</span>
+  <header>
+    <div class="wrap flex" style="justify-content: space-between;">
+      <div class="logo">
+        <span style="display:inline-flex;width:28px;height:28px;border-radius:8px;background:var(--gold);align-items:center;justify-content:center;color:#111827;font-weight:800">G</span>
+        AltınTakip
+        <span class="badge">PWA</span>
+      </div>
+      <div class="flex">
+        <button id="quick-buy" class="btn small">Alış</button>
+        <button id="quick-sell" class="btn small secondary">Satış</button>
+        <button id="themeBtn" class="btn small ghost" title="Tema">Tema</button>
+      </div>
     </div>
   </header>
 
-  <main class="container">
-    <section class="card">
-      <h2>Gram Altın (24K) — TRY</h2>
-      <div class="price-row">
-        <div>
-          <div class="price" id="price">—</div>
-          <div class="sub" id="updatedAt">Son güncelleme: —</div>
-          <div class="sub" id="source">Kaynak: —</div>
-        </div>
-        <button id="refreshBtn" class="btn">Yenile</button>
-      </div>
-      <div class="grid">
-        <div class="info">
-          <div class="label">Ons Altın (TRY/ons)</div>
-          <div id="xautry">—</div>
-        </div>
-        <div class="info">
-          <div class="label">Dönüşüm</div>
-          <div>1 ons = 31.1035 g</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Portföy Özeti</h2>
-      <div class="summary-grid">
-        <div class="metric">
-          <div class="label">Eldeki Gram</div>
-          <div id="sumQty">—</div>
-        </div>
-        <div class="metric">
-          <div class="label">Ortalama Maliyet</div>
-          <div id="avgCost">—</div>
-        </div>
-        <div class="metric">
-          <div class="label">Portföy Değeri</div>
-          <div id="portfolioVal">—</div>
-        </div>
-        <div class="metric">
-          <div class="label">Gerç. K/Z</div>
-          <div id="realizedPnL">—</div>
-        </div>
-        <div class="metric">
-          <div class="label">Gerç. Olmayan K/Z</div>
-          <div id="unrealizedPnL">—</div>
-        </div>
-        <div class="metric">
-          <div class="label">Toplam K/Z</div>
-          <div id="totalPnL">—</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>İşlem Ekle</h2>
-      <div class="trade-form">
-        <label>
-          Tür
-          <select id="txType">
-            <option value="BUY">Alış</option>
-            <option value="SELL">Satış</option>
-          </select>
-        </label>
-        <label>
-          Gram Miktarı
-          <input type="number" id="txQty" step="0.001" min="0.0001" placeholder="Örn: 0.020" inputmode="decimal" />
-        </label>
-        <label>
-          Birim Fiyat (TRY/gr)
-          <div class="input-inline">
-            <input type="number" id="txPrice" step="0.01" min="0.01" placeholder="Güncel fiyat" inputmode="decimal" />
-            <button id="fillCurrentBtn" class="btn small">Güncel</button>
+  <main class="wrap grid" style="gap:16px">
+    <!-- Dashboard -->
+    <section class="grid row-2">
+      <div class="card">
+        <div class="headline">Özet</div>
+        <div class="grid row-3">
+          <div>
+            <div class="muted">Piyasa (TL/g)</div>
+            <div class="big num" id="currentMarket">—</div>
+            <div class="muted" style="font-size:12px">Spread <span class="num" id="spreadPct">7%</span></div>
           </div>
-        </label>
-        <label>
-          Ücret (opsiyonel)
-          <input type="number" id="txFee" step="0.01" min="0" value="0" inputmode="decimal" />
-        </label>
-        <div class="trade-actions">
-          <button id="addTxBtn" class="btn primary">Ekle</button>
-          <button id="clearAllBtn" class="btn danger">Tüm İşlemleri Sil</button>
+          <div>
+            <div class="muted">Banka Alış</div>
+            <div class="big num" id="bankBuy">—</div>
+          </div>
+          <div>
+            <div class="muted">Banka Satış</div>
+            <div class="big num" id="bankSell">—</div>
+          </div>
         </div>
-        <div class="sub">Not: Alış yaparken gram miktarını girin, birim fiyat varsayılan olarak anlık fiyattır.</div>
+        <div class="divider"></div>
+        <div class="grid row-3">
+          <div>
+            <div class="muted">Toplam Altın (g)</div>
+            <div class="big num" id="holdings">0</div>
+          </div>
+          <div>
+            <div class="muted">Portföy Değeri</div>
+            <div class="big num" id="portfolioValue">—</div>
+          </div>
+          <div>
+            <div class="muted">Ort. Maliyet (TL/g)</div>
+            <div class="big num" id="avgCost">—</div>
+          </div>
+        </div>
+        <div class="grid row-2" style="margin-top:10px">
+          <div class="pill num">
+            Net K/Z: <span id="netPnL" class="num">—</span>
+            <span id="unrealizedPct" class="num muted"></span>
+          </div>
+          <div class="pill num">
+            Başabaş Piyasa: <span id="breakEvenMarket">—</span>
+          </div>
+        </div>
+        <div class="space"></div>
+        <div class="grid row-2">
+          <div>
+            <div class="field">
+              <label>Altın kuru (TL/g) — manuel güncelle</label>
+              <div class="flex">
+                <input id="priceInput" inputmode="decimal" class="input" placeholder="Örn: 2000" />
+                <button id="updatePriceBtn" class="btn">Güncelle</button>
+              </div>
+            </div>
+          </div>
+          <div class="grid">
+            <div class="muted" style="font-size:12px">İpucu: Güncel piyasa fiyatını elle güncellersin; tüm hesaplar anında yenilenir.</div>
+            <div class="flex">
+              <span class="pill">Toplam Harcama: <b class="num" id="totalSpent">—</b></span>
+              <span class="pill">Geri Dönüş: <b class="num" id="totalReturned">—</b></span>
+            </div>
+          </div>
+        </div>
+        <div class="space"></div>
+        <div class="grid row-2">
+          <div class="card">
+            <h3>Fiyat Grafiği</h3>
+            <canvas id="priceCanvas" width="600" height="150"></canvas>
+          </div>
+          <div class="card">
+            <h3>Portföy Değeri</h3>
+            <canvas id="valueCanvas" width="600" height="150"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="headline">Öneriler</div>
+        <div class="advice" id="adviceList"></div>
+        <div class="divider"></div>
+        <div class="muted" style="font-size:12px">Bu basit kurallara dayalı önerilerdir, yatırım tavsiyesi değildir.</div>
       </div>
     </section>
 
-    <section class="card">
-      <h2>İşlem Geçmişi</h2>
-      <div class="table-wrap">
-        <table class="tx-table">
+    <!-- Transactions -->
+    <section class="grid row-2">
+      <div class="card">
+        <div class="headline">İşlem Ekle</div>
+        <form id="txForm" class="grid" style="gap:10px">
+          <div class="flex">
+            <button type="button" id="typeBuy" class="btn small">Alış</button>
+            <button type="button" id="typeSell" class="btn small secondary">Satış</button>
+            <span class="muted" id="typeLabel">Seçili: Alış</span>
+          </div>
+          <div class="row-2 grid">
+            <div class="field">
+              <label>Tarih/Saat</label>
+              <input type="datetime-local" id="dateInput" />
+            </div>
+            <div class="field">
+              <label>Gram (g)</label>
+              <input id="gramsInput" inputmode="decimal" class="input" placeholder="Örn: 5" />
+            </div>
+          </div>
+          <div class="row-2 grid">
+            <div class="field">
+              <label>Birim Fiyat (TL/g) — Banka uygulanan</label>
+              <input id="unitPriceInput" inputmode="decimal" class="input" placeholder="Örn: 2140" />
+            </div>
+            <div class="field">
+              <label>O anki Piyasa (opsiyonel)</label>
+              <input id="marketAtTimeInput" inputmode="decimal" class="input" placeholder="Örn: 2000" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Not (opsiyonel)</label>
+            <input id="noteInput" class="input" placeholder="Örn: Ziraat mobil" />
+          </div>
+          <div class="flex" style="justify-content: space-between;">
+            <div class="muted" style="font-size:12px">Satış eklerken, eldeki gramı aşamazsın (tarihine göre kontrol edilir).</div>
+            <button class="btn" type="submit">Kaydet</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="headline">İşlemler</div>
+        <table class="table" id="txTable">
           <thead>
             <tr>
               <th>Tarih</th>
               <th>Tür</th>
-              <th>Gram</th>
-              <th>Birim (₺/gr)</th>
-              <th>Tutar (₺)</th>
-              <th>Ücret</th>
+              <th class="num">Gram</th>
+              <th class="num">Birim (TL/g)</th>
+              <th class="num">Tutar (TL)</th>
               <th></th>
             </tr>
           </thead>
-          <tbody id="txTbody">
-            <tr><td colspan="7" class="empty">Henüz işlem yok</td></tr>
-          </tbody>
+          <tbody id="txTbody"></tbody>
         </table>
       </div>
     </section>
 
-    <section class="card">
-      <h2>Fiyat Alarmı (Cihaz içi bildirim)</h2>
-      <div class="alarm-grid">
-        <label>
-          Hedef Fiyat (TRY)
-          <input type="number" id="alarmTarget" placeholder="Örn: 2500" inputmode="decimal" step="0.01" />
-        </label>
-        <label>
-          Yön
-          <select id="alarmDirection">
-            <option value="ABOVE">Üzerine çıkınca</option>
-            <option value="BELOW">Altına inince</option>
-          </select>
-        </label>
-        <label class="checkbox">
-          <input type="checkbox" id="alarmRepeat" checked />
-          Tekrarlı uyar
-        </label>
-        <div class="alarm-actions">
-          <button id="permBtn" class="btn secondary">Bildirim izni</button>
-          <button id="testNotiBtn" class="btn secondary">Test bildirimi</button>
-          <button id="saveAlarmBtn" class="btn primary">Alarmı Kaydet</button>
-          <button id="disableAlarmBtn" class="btn danger">Alarmı Kapat</button>
+    <!-- Settings -->
+    <section class="grid row-2">
+      <div class="card">
+        <div class="headline">Ayarlar</div>
+        <div class="row-2 grid">
+          <div class="field">
+            <label>Banka Spread (%)</label>
+            <input id="spreadInput" inputmode="decimal" class="input" value="7" />
+          </div>
+          <div class="field">
+            <label>Tema</label>
+            <select id="themeSelect" class="input">
+              <option value="system">Sistem</option>
+              <option value="light">Açık</option>
+              <option value="dark">Koyu</option>
+            </select>
+          </div>
+        </div>
+        <div class="space"></div>
+        <div class="flex">
+          <button id="exportBtn" class="btn ghost">Dışa Aktar (JSON)</button>
+          <label class="btn ghost" for="importFile">İçe Aktar</label>
+          <input id="importFile" type="file" accept="application/json" style="display:none" />
+          <button id="clearBtn" class="btn danger">Tüm Veriyi Sil</button>
         </div>
       </div>
-      <div id="alarmStatus" class="sub">Alarm: pasif</div>
+      <div class="card">
+        <div class="headline">Bilgi</div>
+        <div class="grid">
+          <div class="muted">• Bu uygulama PWA’dır; ana ekrana ekleyip offline kullanabilirsin.</div>
+          <div class="muted">• Verilerin sadece cihazındadır (localStorage).</div>
+          <div class="muted">• “G” logosu temsili. Bu bir yatırım tavsiyesi değildir.</div>
+        </div>
+      </div>
     </section>
   </main>
 
-  <footer class="app-footer">
-    <span>© AltınTakip</span>
-    <span id="version">v1.3.0</span>
-  </footer>
+  <footer>© <span id="year"></span> AltınTakip</footer>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script>
+    // ------------- Utilities
+    const qs = s => document.querySelector(s);
+    const qsa = s => Array.from(document.querySelectorAll(s));
+    const toISO = d => new Date(d).toISOString();
+    const parseNum = v => {
+      if (typeof v === 'number') return v;
+      if (!v) return NaN;
+      return parseFloat(String(v).replace(/\./g,'').replace(',', '.'));
+    };
+    const fmtTL = n => (n == null || isNaN(n)) ? '—' : n.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 });
+    const fmtNum = n => (n == null || isNaN(n)) ? '—' : n.toLocaleString('tr-TR', { maximumFractionDigits: 4 });
+    const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const dtLocalValue = (d=new Date()) => {
+      const pad = x => String(x).padStart(2,'0');
+      const yy = d.getFullYear();
+      const mm = pad(d.getMonth()+1);
+      const dd = pad(d.getDate());
+      const hh = pad(d.getHours());
+      const mi = pad(d.getMinutes());
+      return `${yy}-${mm}-${dd}T${hh}:${mi}`;
+    };
 
-  <script src="app.js" defer></script>
+    // ------------- Storage
+    const LS_KEYS = {
+      tx: 'altintakip_transactions',
+      prices: 'altintakip_prices',
+      settings: 'altintakip_settings'
+    };
+    const load = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def } catch(e){ return def } };
+    const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+    let transactions = load(LS_KEYS.tx, []);
+    let prices = load(LS_KEYS.prices, []); // {id,date,marketPrice}
+    let settings = load(LS_KEYS.settings, { spread: 0.07, theme: 'system' });
+
+    // ------------- Theme
+    function applyTheme() {
+      let t = settings.theme;
+      if (t === 'system') {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        t = mq.matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    }
+    applyTheme();
+
+    // ------------- Finance core
+    function sortByDateAsc(a,b){ return new Date(a.date) - new Date(b.date) || (a.id||'').localeCompare(b.id||'') }
+    function sortByDateDesc(a,b){ return new Date(b.date) - new Date(a.date) || (b.id||'').localeCompare(a.id||'') }
+
+    function recomputePortfolio(txns) {
+      const tx = [...txns].sort(sortByDateAsc);
+      let holdings = 0, avgCost = 0, realized = 0, totalSpent = 0, totalReturned = 0;
+      for (const t of tx) {
+        if (t.type === 'buy') {
+          const costTotal = avgCost * holdings + t.unitPriceBank * t.grams;
+          holdings += t.grams;
+          avgCost = holdings > 0 ? costTotal / holdings : 0;
+          totalSpent += t.unitPriceBank * t.grams;
+        } else {
+          const sellG = Math.min(t.grams, holdings);
+          realized += (t.unitPriceBank - avgCost) * sellG;
+          holdings -= sellG;
+          totalReturned += t.unitPriceBank * sellG;
+        }
+      }
+      return { holdings, avgCost, realizedPnL: realized, totalSpent, totalReturned };
+    }
+
+    function holdingsAt(dateISO, txns) {
+      const tx = [...txns].filter(t => new Date(t.date) <= new Date(dateISO)).sort(sortByDateAsc);
+      let h = 0;
+      for (const t of tx) h += t.type === 'buy' ? t.grams : -t.grams;
+      return h;
+    }
+
+    function getCurrentMarket() {
+      if (!prices.length) return null;
+      const last = [...prices].sort(sortByDateAsc).at(-1);
+      return last?.marketPrice ?? null;
+    }
+
+    function computeAll() {
+      const { holdings, avgCost, realizedPnL, totalSpent, totalReturned } = recomputePortfolio(transactions);
+      const currentMarket = getCurrentMarket();
+      const spread = settings.spread ?? 0.07;
+      const bankBuy = currentMarket != null ? currentMarket * (1 + spread) : null;
+      const bankSell = currentMarket != null ? currentMarket * (1 - spread) : null;
+      const portfolioValue = (bankSell != null) ? holdings * bankSell : null;
+      const unrealizedPnL = (bankSell != null) ? (bankSell - avgCost) * holdings : null;
+      const netPnL = (unrealizedPnL != null) ? (realizedPnL + unrealizedPnL) : realizedPnL;
+      const unrealizedPct = (bankSell != null && avgCost > 0 && holdings > 0) ? ((bankSell - avgCost) / avgCost) * 100 : null;
+      const breakEvenMarket = avgCost > 0 ? avgCost / (1 - spread) : null;
+
+      // Series for charts (price + portfolio value over time)
+      const priceEvents = [
+        ...prices.map(p => ({ kind:'price', date:p.date, market:p.marketPrice, id:p.id })),
+        ...transactions.filter(t => t.marketPriceAtTime).map(t => ({ kind:'price', date: t.date, market: t.marketPriceAtTime, id:t.id+'p' }))
+      ].sort(sortByDateAsc);
+
+      const events = [
+        ...transactions.map(t => ({ kind:'tx', ...t })),
+        ...priceEvents
+      ].sort((a,b) => new Date(a.date) - new Date(b.date) || (a.kind === 'tx' ? -1 : 1)); // tx before price if same time
+
+      let h=0, ac=0;
+      const priceSeries = [];
+      const valueSeries = [];
+      for (const ev of events) {
+        if (ev.kind === 'tx') {
+          if (ev.type === 'buy') {
+            const tot = ac * h + ev.unitPriceBank * ev.grams;
+            h += ev.grams;
+            ac = h>0 ? tot/h : 0;
+          } else {
+            const g = Math.min(ev.grams, h);
+            h -= g;
+          }
+        } else {
+          const bankSellEv = ev.market * (1 - spread);
+          priceSeries.push({ x: new Date(ev.date), y: ev.market });
+          valueSeries.push({ x: new Date(ev.date), y: h * bankSellEv });
+        }
+      }
+
+      return {
+        holdings, avgCost, realizedPnL, totalSpent, totalReturned,
+        currentMarket, bankBuy, bankSell,
+        portfolioValue, unrealizedPnL, netPnL, unrealizedPct, breakEvenMarket,
+        series: { priceSeries, valueSeries }
+      };
+    }
+
+    function buildAdvice(state) {
+      const tips = [];
+      const { holdings, avgCost, currentMarket } = state;
+      const spread = settings.spread ?? 0.07;
+      if (!currentMarket) {
+        tips.push('Piyasa fiyatı girilmedi. “Altın kuru” alanından güncelle.');
+        return tips;
+      }
+      const bankSell = currentMarket * (1 - spread);
+      if (holdings <= 0) {
+        tips.push('Pozisyonun yok. Fiyatı izleyebilir, uygun bulduğunda alış ekleyebilirsin.');
+        return tips;
+      }
+      const gainPct = avgCost>0 ? (bankSell - avgCost) / avgCost : 0;
+      if (gainPct >= 0.03) tips.push('Kâr %3 üzeri — satmayı düşünebilirsin.');
+      else if (gainPct <= -0.03) tips.push('Maliyetinin altında — beklemek mantıklı olabilir.');
+      tips.push(`Başabaş piyasa: ${fmtNum(avgCost/(1-spread))} TL/g`);
+      const futureMarket = currentMarket * 0.9;
+      const futureSell = futureMarket * (1 - spread);
+      const futureValue = holdings * futureSell;
+      tips.push(`%10 düşüşte portföy değeri: ${fmtTL(futureValue)}`);
+      return tips;
+    }
+
+    // ------------- Rendering
+    function setText(id, txt, cls) {
+      const el = qs('#'+id);
+      if (!el) return;
+      el.textContent = txt;
+      if (cls) { el.classList.remove('ok','bad'); el.classList.add(cls); }
+    }
+
+    function drawSpark(canvas, data, color) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+      if (!data || data.length < 2) {
+        ctx.fillStyle = '#8884';
+        ctx.fillText('Yeterli veri yok', 10, 18);
+        return;
+      }
+      const xs = data.map(p=>p.x.getTime());
+      const ys = data.map(p=>p.y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const pad = 8;
+      const xScale = t => pad + (w-2*pad) * ( (t-minX) / (maxX-minX || 1) );
+      const yScale = v => h-pad - (h-2*pad) * ( (v-minY) / (maxY-minY || 1) );
+      ctx.lineWidth = 2;
+      // gradient line
+      const grad = ctx.createLinearGradient(0,0,0,h);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, color + '88');
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      data.forEach((p,i)=>{
+        const x = xScale(p.x.getTime()), y = yScale(p.y);
+        if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+      // fill under
+      ctx.lineTo(xScale(xs.at(-1)), h-pad);
+      ctx.lineTo(xScale(xs[0]), h-pad);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.globalAlpha = 0.12;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // axis hint
+      ctx.strokeStyle = '#ffffff22';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad, yScale(ys.at(-1))); ctx.lineTo(w-pad, yScale(ys.at(-1))); ctx.stroke();
+    }
+
+    function render() {
+      save(LS_KEYS.tx, transactions);
+      save(LS_KEYS.prices, prices);
+      save(LS_KEYS.settings, settings);
+
+      const state = computeAll();
+      const {
+        holdings, avgCost, realizedPnL, totalSpent, totalReturned,
+        currentMarket, bankBuy, bankSell,
+        portfolioValue, unrealizedPnL, netPnL, unrealizedPct, breakEvenMarket,
+        series
+      } = state;
+
+      setText('spreadPct', `${Math.round((settings.spread ?? 0.07)*100)}%`);
+      setText('currentMarket', currentMarket!=null ? fmtTL(currentMarket) : '—');
+      setText('bankBuy', bankBuy!=null ? fmtTL(bankBuy) : '—');
+      setText('bankSell', bankSell!=null ? fmtTL(bankSell) : '—');
+
+      setText('holdings', fmtNum(holdings));
+      setText('portfolioValue', portfolioValue!=null ? fmtTL(portfolioValue) : '—');
+      setText('avgCost', avgCost>0 ? fmtTL(avgCost) : '—');
+
+      const pnlCls = netPnL>0 ? 'ok' : (netPnL<0 ? 'bad' : undefined);
+      setText('netPnL', netPnL!=null ? fmtTL(netPnL) : '—', pnlCls);
+      setText('unrealizedPct', unrealizedPct!=null ? `(${unrealizedPct.toFixed(2)}%)` : '');
+      setText('breakEvenMarket', breakEvenMarket!=null ? fmtTL(breakEvenMarket) : '—');
+
+      setText('totalSpent', fmtTL(totalSpent));
+      setText('totalReturned', fmtTL(totalReturned));
+
+      // table
+      const tbody = qs('#txTbody');
+      tbody.innerHTML = '';
+      const rows = [...transactions].sort(sortByDateDesc);
+      for (const t of rows) {
+        const tr = document.createElement('tr');
+        const dateStr = new Date(t.date).toLocaleString('tr-TR');
+        tr.innerHTML = `
+          <td>${dateStr}</td>
+          <td><span class="tag ${t.type}">${t.type==='buy'?'Alış':'Satış'}</span></td>
+          <td class="num">${fmtNum(t.grams)}</td>
+          <td class="num">${fmtTL(t.unitPriceBank)}</td>
+          <td class="num">${fmtTL(t.unitPriceBank * t.grams)}</td>
+          <td class="num"><button class="btn small ghost" data-del="${t.id}">Sil</button></td>
+        `;
+        tbody.appendChild(tr);
+      }
+      qsa('[data-del]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-del');
+          transactions = transactions.filter(t => t.id !== id);
+          render();
+        });
+      });
+
+      // advice
+      const adv = qs('#adviceList');
+      adv.innerHTML = '';
+      for (const t of buildAdvice(state)) {
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.textContent = '• ' + t;
+        adv.appendChild(div);
+      }
+
+      // charts
+      drawSpark(qs('#priceCanvas'), series.priceSeries, getComputedStyle(document.body).getPropertyValue('--gold').trim());
+      drawSpark(qs('#valueCanvas'), series.valueSeries, getComputedStyle(document.body).getPropertyValue('--green').trim());
+    }
+
+    // ------------- Events
+    // price update
+    qs('#updatePriceBtn').addEventListener('click', () => {
+      const v = parseNum(qs('#priceInput').value);
+      if (!isFinite(v) || v <= 0) { alert('Geçerli bir fiyat giriniz'); return; }
+      prices.push({ id: uid(), date: new Date().toISOString(), marketPrice: v });
+      qs('#priceInput').value = '';
+      render();
+    });
+
+    // quick action buttons
+    let currentType = 'buy';
+    function setType(t) {
+      currentType = t;
+      qs('#typeLabel').textContent = 'Seçili: ' + (t==='buy'?'Alış':'Satış');
+      qs('#typeBuy').className = 'btn small' + (t==='buy'?'':' secondary');
+      qs('#typeSell').className = 'btn small' + (t==='sell'?'':' secondary');
+    }
+    qs('#typeBuy').addEventListener('click', ()=>setType('buy'));
+    qs('#typeSell').addEventListener('click', ()=>setType('sell'));
+    qs('#quick-buy').addEventListener('click', ()=>{ setType('buy'); window.scrollTo({ top: document.body.scrollHeight/3, behavior:'smooth' }); });
+    qs('#quick-sell').addEventListener('click', ()=>{ setType('sell'); window.scrollTo({ top: document.body.scrollHeight/3, behavior:'smooth' }); });
+
+    // tx form defaults
+    qs('#dateInput').value = dtLocalValue(new Date());
+    setType('buy');
+
+    // tx submit
+    qs('#txForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const date = qs('#dateInput').value ? new Date(qs('#dateInput').value) : new Date();
+      const grams = parseNum(qs('#gramsInput').value);
+      const unitPrice = parseNum(qs('#unitPriceInput').value);
+      const mktAt = parseNum(qs('#marketAtTimeInput').value);
+      const note = qs('#noteInput').value?.trim() || undefined;
+
+      if (!isFinite(grams) || grams <= 0) return alert('Geçerli gram giriniz');
+      if (!isFinite(unitPrice) || unitPrice <= 0) return alert('Geçerli birim fiyat giriniz');
+
+      // satış validasyon - tarihe kadar eldeki gram
+      if (currentType === 'sell') {
+        const h = holdingsAt(date.toISOString(), transactions);
+        if (grams > h) return alert(`Eldeki gram (${fmtNum(h)}) üstünde satış yapılamaz`);
+      }
+
+      const tx = {
+        id: uid(),
+        date: date.toISOString(),
+        type: currentType,
+        grams,
+        unitPriceBank: unitPrice,
+        marketPriceAtTime: isFinite(mktAt) ? mktAt : undefined,
+        note
+      };
+      transactions.push(tx);
+
+      // opsiyonel piyasa girdiyse, fiyat geçmişine ekleyelim
+      if (isFinite(mktAt)) prices.push({ id: uid(), date: tx.date, marketPrice: mktAt });
+
+      // reset quick
+      qs('#gramsInput').value = '';
+      qs('#unitPriceInput').value = '';
+      qs('#marketAtTimeInput').value = '';
+      qs('#noteInput').value = '';
+      qs('#dateInput').value = dtLocalValue(new Date());
+      render();
+    });
+
+    // settings
+    const spreadInput = qs('#spreadInput');
+    spreadInput.value = (settings.spread*100).toString();
+    spreadInput.addEventListener('change', () => {
+      const v = parseNum(spreadInput.value);
+      if (!isFinite(v) || v<0 || v>50) return alert('0-50 arası bir yüzde giriniz');
+      settings.spread = v/100;
+      render();
+    });
+
+    const themeSelect = qs('#themeSelect');
+    themeSelect.value = settings.theme ?? 'system';
+    themeSelect.addEventListener('change', () => {
+      settings.theme = themeSelect.value;
+      applyTheme();
+      render();
+    });
+
+    qs('#themeBtn').addEventListener('click', () => {
+      const order = ['system','light','dark'];
+      const idx = order.indexOf(settings.theme ?? 'system');
+      settings.theme = order[(idx+1)%order.length];
+      themeSelect.value = settings.theme;
+      applyTheme(); render();
+    });
+
+    // export/import/clear
+    qs('#exportBtn').addEventListener('click', () => {
+      const data = { transactions, prices, settings };
+      const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'altintakip-backup.json'; a.click();
+      URL.revokeObjectURL(url);
+    });
+    qs('#importFile').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const txt = await file.text();
+        const data = JSON.parse(txt);
+        if (!data) throw new Error('Geçersiz dosya');
+        if (Array.isArray(data.transactions)) transactions = data.transactions;
+        if (Array.isArray(data.prices)) prices = data.prices;
+        if (data.settings) settings = { ...settings, ...data.settings };
+        applyTheme(); render();
+        alert('İçe aktarıldı');
+      } catch (err) {
+        alert('İçe aktarma hatası: '+err.message);
+      } finally {
+        e.target.value = '';
+      }
+    });
+    qs('#clearBtn').addEventListener('click', () => {
+      if (!confirm('Tüm verileri silmek istediğine emin misin?')) return;
+      transactions = []; prices = []; settings = { spread: 0.07, theme: 'system' };
+      applyTheme(); render();
+    });
+
+    // footer year
+    qs('#year').textContent = new Date().getFullYear();
+
+    // first render
+    render();
+
+    // ------------- PWA: Service Worker register (localhost/https)
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(console.error);
+      });
+    }
+  </script>
 </body>
 </html>
