@@ -2,16 +2,17 @@
   const GRAMS_PER_TROY_OUNCE = 31.1035;
   const PRICE_POLL_MS = 60_000;
 
-  // Elements
+  // Elements - Price
   const elPrice = document.getElementById('price');
   const elUpdatedAt = document.getElementById('updatedAt');
-  const elXauusd = document.getElementById('xauusd');
-  const elUsdtry = document.getElementById('usdtry');
+  const elXauTry = document.getElementById('xautry');
+  const elSource = document.getElementById('source');
   const elRefresh = document.getElementById('refreshBtn');
   const elNetStatus = document.getElementById('netStatus');
   const elSwStatus = document.getElementById('swStatus');
   const elToast = document.getElementById('toast');
 
+  // Alarm
   const elAlarmTarget = document.getElementById('alarmTarget');
   const elAlarmDirection = document.getElementById('alarmDirection');
   const elAlarmRepeat = document.getElementById('alarmRepeat');
@@ -21,15 +22,34 @@
   const elTestNotiBtn = document.getElementById('testNotiBtn');
   const elAlarmStatus = document.getElementById('alarmStatus');
 
-  let lastPrice = null;
-  let lastXauUsd = null;
-  let lastUsdTry = null;
-  let lastSide = null; // 'ABOVE' | 'BELOW'
+  // Portfolio summary
+  const elSumQty = document.getElementById('sumQty');
+  const elAvgCost = document.getElementById('avgCost');
+  const elPortfolioVal = document.getElementById('portfolioVal');
+  const elRealizedPnL = document.getElementById('realizedPnL');
+  const elUnrealizedPnL = document.getElementById('unrealizedPnL');
+  const elTotalPnL = document.getElementById('totalPnL');
+
+  // Trade form
+  const elTxType = document.getElementById('txType');
+  const elTxQty = document.getElementById('txQty');
+  const elTxPrice = document.getElementById('txPrice');
+  const elTxFee = document.getElementById('txFee');
+  const elAddTx = document.getElementById('addTxBtn');
+  const elClearAll = document.getElementById('clearAllBtn');
+  const elFillCurrent = document.getElementById('fillCurrentBtn');
+  const elTxTbody = document.getElementById('txTbody');
+
+  // State
+  let lastGramPrice = null;   // TRY/gram
+  let lastXauTry = null;      // TRY/ounce
   let pollTimer = null;
 
   const alarmKey = 'altintakip_alarm';
-  const priceKey = 'altintakip_last_price';
+  const priceKey = 'altintakip_last_price_v3';
+  const txKey = 'altintakip_txns_v1';
 
+  // Utils
   function saveLocal(key, val) {
     localStorage.setItem(key, JSON.stringify(val));
   }
@@ -37,24 +57,38 @@
     try { return JSON.parse(localStorage.getItem(key)) ?? def; }
     catch { return def; }
   }
-
-  function formatTRY(v) {
-    if (v == null || Number.isNaN(v)) return '—';
-    try {
-      return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 }).format(v);
-    } catch {
-      return v.toFixed(2) + ' ₺';
-    }
-  }
-  function formatNumber(v, digits = 2) {
-    if (v == null || Number.isNaN(v)) return '—';
-    return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: digits }).format(v);
-  }
   function nowStr() {
     return new Date().toLocaleString('tr-TR');
   }
+  function formatTRY(v, digits = 2) {
+    if (v == null || Number.isNaN(v)) return '—';
+    try {
+      return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: digits }).format(v);
+    } catch {
+      return (Math.round(v * 100) / 100).toFixed(digits) + ' ₺';
+    }
+  }
+  function formatNum(v, digits = 3) {
+    if (v == null || Number.isNaN(v)) return '—';
+    return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: digits }).format(v);
+  }
+  function toast(msg) {
+    elToast.textContent = msg;
+    elToast.style.display = 'block';
+    clearTimeout(elToast._t);
+    elToast._t = setTimeout(() => {
+      elToast.style.display = 'none';
+    }, 2500);
+  }
+  function setOnlineStatus() {
+    const online = navigator.onLine;
+    elNetStatus.textContent = online ? 'Online' : 'Offline';
+    elNetStatus.classList.toggle('online', online);
+    elNetStatus.classList.toggle('offline', !online);
+  }
 
-  async function fetchJSON(url, timeoutMs = 8000) {
+  // Fetch helpers
+  async function fetchJSON(url, timeoutMs = 10000) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -66,93 +100,182 @@
     }
   }
 
-  async function getXAUUSD() {
-    // Primary: exchangerate.host convert
-    try {
-      const data = await fetchJSON('https://api.exchangerate.host/convert?from=XAU&to=USD');
-      if (data && typeof data.result === 'number') return data.result;
-    } catch {}
-    // Fallback: latest base=USD, symbols=XAU -> invert
-    try {
-      const data = await fetchJSON('https://api.exchangerate.host/latest?base=USD&symbols=XAU');
-      const r = data?.rates?.XAU;
-      if (typeof r === 'number' && r > 0) return 1 / r;
-    } catch {}
-    throw new Error('XAUUSD alınamadı');
+  // Primary source: Daily rates via jsDelivr (no API key, wide CORS)
+  async function tryJsDelivrXAUTRY() {
+    const data = await fetchJSON('https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/xau/try.json');
+    const xauTry = data && typeof data['try'] === 'number' ? data['try'] : null;
+    if (!xauTry) throw new Error('jsDelivr yok');
+    return { xauTry, source: 'jsDelivr (günlük)' };
   }
 
-  async function getUSDTRY() {
-    // Primary: exchangerate.host convert
-    try {
-      const data = await fetchJSON('https://api.exchangerate.host/convert?from=USD&to=TRY');
-      if (data && typeof data.result === 'number') return data.result;
-    } catch {}
-    // Fallback: frankfurter.app
-    try {
-      const data = await fetchJSON('https://api.frankfurter.app/latest?from=USD&to=TRY');
-      const r = data?.rates?.TRY;
-      if (typeof r === 'number') return r;
-    } catch {}
-    throw new Error('USDTRY alınamadı');
-  }
-
-  async function getGramTRY() {
-    const [xauusd, usdtry] = await Promise.all([getXAUUSD(), getUSDTRY()]);
-    const gramTry = (xauusd / GRAMS_PER_TROY_OUNCE) * usdtry;
-    return { gramTry, xauusd, usdtry };
-  }
-
-  function setOnlineStatus() {
-    const online = navigator.onLine;
-    elNetStatus.textContent = online ? 'Online' : 'Offline';
-    elNetStatus.classList.toggle('online', online);
-    elNetStatus.classList.toggle('offline', !online);
-  }
-
-  function toast(msg) {
-    elToast.textContent = msg;
-    elToast.style.display = 'block';
-    clearTimeout(elToast._t);
-    elToast._t = setTimeout(() => {
-      elToast.style.display = 'none';
-    }, 2500);
-  }
-
-  function updateUI({ gramTry, xauusd, usdtry }, fromCache = false) {
-    lastPrice = gramTry;
-    lastXauUsd = xauusd;
-    lastUsdTry = usdtry;
-
-    elPrice.textContent = formatTRY(gramTry);
-    elXauusd.textContent = xauusd ? `${formatNumber(xauusd, 2)} USD/ons` : '—';
-    elUsdtry.textContent = usdtry ? formatNumber(usdtry, 4) : '—';
-    elUpdatedAt.textContent = `Son güncelleme: ${nowStr()}${fromCache ? ' (önbellek)' : ''}`;
-    document.title = `₺${(gramTry ?? 0).toFixed(2)} • AltınTakip`;
-
-    // Persist last price
-    saveLocal(priceKey, {
-      gramTry, xauusd, usdtry, ts: Date.now()
-    });
-
-    // Alarm check
-    runAlarmCheck(gramTry);
-  }
-
-  function loadLastPriceFromCache() {
-    const cached = loadLocal(priceKey);
-    if (cached && typeof cached.gramTry === 'number') {
-      updateUI(cached, true);
+  // Fallback: exchangerate.host (genelde anahtarsız)
+  async function tryExHostXAUTRY() {
+    const d = await fetchJSON('https://api.exchangerate.host/convert?from=XAU&to=TRY');
+    if (d && typeof d.result === 'number' && d.result > 0) {
+      return { xauTry: d.result, source: 'exchangerate.host' };
     }
+    throw new Error('exchangerate.host yok');
+  }
+
+  // Last fallback: XAUUSD * USDTRY
+  async function tryTwoStep() {
+    const d1 = await fetchJSON('https://api.exchangerate.host/convert?from=XAU&to=USD');
+    const xauusd = d1 && typeof d1.result === 'number' ? d1.result : null;
+    if (!xauusd) throw new Error('XAUUSD yok');
+    let usdtry = null;
+    try {
+      const d2 = await fetchJSON('https://api.exchangerate.host/convert?from=USD&to=TRY');
+      if (d2 && typeof d2.result === 'number') usdtry = d2.result;
+    } catch {}
+    if (!usdtry) {
+      const d3 = await fetchJSON('https://api.frankfurter.app/latest?from=USD&to=TRY');
+      usdtry = d3?.rates?.TRY;
+    }
+    if (!usdtry) throw new Error('USDTRY yok');
+    return { xauTry: xauusd * usdtry, source: 'iki adım (XAUUSD*USDTRY)' };
+  }
+
+  async function getXAU_TRY_Ounce() {
+    const errors = [];
+    for (const fn of [tryJsDelivrXAUTRY, tryExHostXAUTRY, tryTwoStep]) {
+      try { return await fn(); } catch (e) { errors.push(e.message); }
+    }
+    throw new Error('Fiyat alınamadı: ' + errors.join(' | '));
   }
 
   async function refreshPrice() {
     try {
-      const data = await getGramTRY();
-      updateUI(data, false);
+      const { xauTry, source } = await getXAU_TRY_Ounce(); // TRY/oz
+      const gramTry = xauTry / GRAMS_PER_TROY_OUNCE; // TRY/gram
+      lastXauTry = xauTry;
+      lastGramPrice = gramTry;
+
+      elPrice.textContent = formatTRY(gramTry);
+      elXauTry.textContent = formatTRY(xauTry, 2) + ' / ons';
+      elUpdatedAt.textContent = `Son güncelleme: ${nowStr()}`;
+      elSource.textContent = `Kaynak: ${source}`;
+      document.title = `₺${(gramTry ?? 0).toFixed(2)} • AltınTakip`;
+
+      // Persist
+      saveLocal(priceKey, { xauTry, gramTry, source, ts: Date.now() });
+
+      // Update portfolio dependent on price
+      renderPortfolio();
+
+      // Alarm check
+      runAlarmCheck(gramTry);
     } catch (e) {
-      toast('Fiyat alınamadı. Son veri gösteriliyor.');
-      if (lastPrice == null) loadLastPriceFromCache();
+      const cached = loadLocal(priceKey);
+      if (cached && typeof cached.gramTry === 'number') {
+        lastXauTry = cached.xauTry;
+        lastGramPrice = cached.gramTry;
+        elPrice.textContent = formatTRY(cached.gramTry);
+        elXauTry.textContent = formatTRY(cached.xauTry, 2) + ' / ons';
+        elUpdatedAt.textContent = `Son güncelleme: ${new Date(cached.ts).toLocaleString('tr-TR')} (önbellek)`;
+        elSource.textContent = `Kaynak: ${cached.source || 'önbellek'}`;
+        renderPortfolio();
+        toast('Ağ hatası: önbellek gösteriliyor');
+      } else {
+        elPrice.textContent = '—';
+        elXauTry.textContent = '—';
+        elSource.textContent = 'Kaynak: —';
+        toast('Fiyat alınamadı (ağ veya CORS).');
+      }
     }
+  }
+
+  // Transactions
+  function loadTxns() {
+    return loadLocal(txKey, []);
+  }
+  function saveTxns(list) {
+    saveLocal(txKey, list);
+  }
+  function addTxn(tx) {
+    const list = loadTxns();
+    list.push(tx);
+    saveTxns(list);
+  }
+  function deleteTxn(id) {
+    const list = loadTxns().filter(x => x.id !== id);
+    saveTxns(list);
+  }
+  function clearAllTxns() {
+    saveTxns([]);
+  }
+
+  function calcWAC(transactions) {
+    // transactions: sorted by date asc
+    let qty = 0, cost = 0, realized = 0;
+    for (const t of transactions) {
+      const fee = t.fee || 0;
+      if (t.type === 'BUY') {
+        qty += t.qty;
+        cost += t.qty * t.unitPrice + fee;
+      } else if (t.type === 'SELL') {
+        if (qty <= 0) continue;
+        const avg = cost / qty;
+        realized += (t.unitPrice - avg) * t.qty - fee;
+        qty -= t.qty;
+        cost -= avg * t.qty;
+      }
+    }
+    const avgCost = qty > 0 ? (cost / qty) : 0;
+    return { qty, avgCost, realized, cost };
+  }
+
+  function renderTxTable() {
+    const list = loadTxns().sort((a, b) => a.ts - b.ts);
+    if (list.length === 0) {
+      elTxTbody.innerHTML = '<tr><td colspan="7" class="empty">Henüz işlem yok</td></tr>';
+      return;
+    }
+    const rows = list.map(t => {
+      const total = t.unitPrice * t.qty;
+      return `<tr>
+        <td>${new Date(t.ts).toLocaleString('tr-TR')}</td>
+        <td>${t.type === 'BUY' ? '<span class="tag-buy">Alış</span>' : '<span class="tag-sell">Satış</span>'}</td>
+        <td>${formatNum(t.qty, 3)} g</td>
+        <td>${formatTRY(t.unitPrice)}</td>
+        <td>${formatTRY(total)}</td>
+        <td>${t.fee ? formatTRY(t.fee) : '—'}</td>
+        <td><button class="btn small" data-del="${t.id}">Sil</button></td>
+      </tr>`;
+    }).join('');
+    elTxTbody.innerHTML = rows;
+    // Bind delete
+    elTxTbody.querySelectorAll('button[data-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-del');
+        deleteTxn(id);
+        renderTxTable();
+        renderPortfolio();
+        toast('İşlem silindi');
+      });
+    });
+  }
+
+  function renderPortfolio() {
+    const list = loadTxns().sort((a, b) => a.ts - b.ts);
+    const { qty, avgCost, realized } = calcWAC(list);
+    const cur = lastGramPrice;
+    const value = (cur ?? 0) * qty;
+    const unrealized = qty > 0 && cur != null ? (cur - avgCost) * qty : 0;
+    const totalPnL = realized + unrealized;
+
+    elSumQty.textContent = qty > 0 ? `${formatNum(qty, 3)} g` : '0 g';
+    elAvgCost.textContent = qty > 0 ? formatTRY(avgCost) : '—';
+    elPortfolioVal.textContent = formatTRY(value);
+    setPnL(elRealizedPnL, realized);
+    setPnL(elUnrealizedPnL, unrealized);
+    setPnL(elTotalPnL, totalPnL);
+  }
+
+  function setPnL(el, v) {
+    el.textContent = formatTRY(v);
+    el.classList.remove('value-positive', 'value-negative');
+    if (v > 0) el.classList.add('value-positive');
+    else if (v < 0) el.classList.add('value-negative');
   }
 
   // Alarm logic
@@ -166,12 +289,10 @@
       lastNotifiedAt: null
     });
   }
-
   function writeAlarm(a) {
     saveLocal(alarmKey, a);
     renderAlarmStatus(a);
   }
-
   function renderAlarmStatus(a = readAlarm()) {
     if (!a.active || !a.target) {
       elAlarmStatus.textContent = 'Alarm: pasif';
@@ -181,17 +302,15 @@
     const repeatTxt = a.repeat ? ' (tekrarlı)' : ' (tek sefer)';
     elAlarmStatus.textContent = `Alarm aktif: ${formatTRY(a.target)} ${dirTxt}${repeatTxt}`;
   }
-
   function currentSide(price, target) {
     if (price == null || target == null) return null;
     return price >= target ? 'ABOVE' : 'BELOW';
   }
-
   function notify(title, body) {
     if (Notification.permission === 'granted') {
       const n = new Notification(title, {
         body,
-        icon: '/icons/icon.svg',
+        icon: 'icons/icon.svg',
         vibrate: [80, 40, 80],
         tag: 'altintakip-price',
         renotify: true
@@ -201,7 +320,6 @@
       toast(`${title} — ${body}`);
     }
   }
-
   function runAlarmCheck(price) {
     const a = readAlarm();
     if (!a.active || !a.target || typeof price !== 'number') return;
@@ -222,9 +340,7 @@
       notify('Altın Fiyat Alarmı', `Gram altın ${formatTRY(price)} oldu (hedef: ${formatTRY(a.target)})`);
       a.lastSide = side;
       a.lastNotifiedAt = Date.now();
-      if (!a.repeat) {
-        a.active = false;
-      }
+      if (!a.repeat) a.active = false;
       writeAlarm(a);
     } else {
       if (a.lastSide !== side) {
@@ -234,7 +350,7 @@
     }
   }
 
-  // UI events
+  // Event handlers
   elRefresh.addEventListener('click', refreshPrice);
 
   window.addEventListener('online', setOnlineStatus);
@@ -253,22 +369,24 @@
     notify('Test Bildirimi', 'Bildirimler çalışıyor.');
   });
 
-  elSaveAlarm.addEventListener('click', () => {
+  // Save alarm
+  function alarmTargetInput() {
     const target = parseFloat(elAlarmTarget.value);
-    if (!Number.isFinite(target) || target <= 0) {
-      toast('Geçerli bir hedef fiyat girin');
-      return;
-    }
+    if (!Number.isFinite(target) || target <= 0) return null;
+    return target;
+  }
+  elSaveAlarm.addEventListener('click', () => {
+    const target = alarmTargetInput();
+    if (!target) { toast('Geçerli bir hedef fiyat girin'); return; }
     const a = readAlarm();
     a.active = true;
     a.target = target;
     a.direction = elAlarmDirection.value;
     a.repeat = !!elAlarmRepeat.checked;
-    a.lastSide = currentSide(lastPrice, target);
+    a.lastSide = currentSide(lastGramPrice, target);
     writeAlarm(a);
     toast('Alarm kaydedildi');
   });
-
   elDisableAlarm.addEventListener('click', () => {
     const a = readAlarm();
     a.active = false;
@@ -276,39 +394,99 @@
     toast('Alarm kapatıldı');
   });
 
-  // Prefill alarm UI from storage
-  (function initAlarmUI() {
+  // Trade form actions
+  elFillCurrent.addEventListener('click', () => {
+    if (lastGramPrice) {
+      elTxPrice.value = (Math.round(lastGramPrice * 100) / 100).toFixed(2);
+      toast('Güncel fiyat dolduruldu');
+    } else {
+      toast('Güncel fiyat yok');
+    }
+  });
+
+  elAddTx.addEventListener('click', () => {
+    const type = elTxType.value; // BUY | SELL
+    const qty = parseFloat(elTxQty.value);
+    const unitPrice = parseFloat(elTxPrice.value || lastGramPrice);
+    const fee = parseFloat(elTxFee.value || '0') || 0;
+
+    if (!Number.isFinite(qty) || qty <= 0) { toast('Geçerli gram miktarı girin'); return; }
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) { toast('Geçerli birim fiyat girin'); return; }
+
+    // SELL kontrol: mevcuttan fazla satma
+    const curList = loadTxns().sort((a, b) => a.ts - b.ts);
+    const { qty: haveQty } = calcWAC(curList);
+    if (type === 'SELL' && qty > haveQty + 1e-9) {
+      toast(`Yetersiz gram. Elde: ${formatNum(haveQty, 3)} g`);
+      return;
+    }
+
+    const tx = {
+      id: 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      type,
+      qty: Math.round(qty * 1000) / 1000, // 0.001g hassasiyet
+      unitPrice: Math.round(unitPrice * 100) / 100,
+      fee: Math.round(fee * 100) / 100,
+      ts: Date.now()
+    };
+    addTxn(tx);
+    elTxQty.value = '';
+    elTxPrice.value = '';
+    elTxFee.value = '0';
+
+    renderTxTable();
+    renderPortfolio();
+    toast('İşlem eklendi');
+  });
+
+  elClearAll.addEventListener('click', () => {
+    if (confirm('Tüm işlemleri silmek istiyor musunuz?')) {
+      clearAllTxns();
+      renderTxTable();
+      renderPortfolio();
+      toast('Tüm işlemler silindi');
+    }
+  });
+
+  // Init
+  (function init() {
+    // Prefill price from cache
+    const cached = loadLocal(priceKey);
+    if (cached && typeof cached.gramTry === 'number') {
+      lastXauTry = cached.xauTry;
+      lastGramPrice = cached.gramTry;
+      elPrice.textContent = formatTRY(cached.gramTry);
+      elXauTry.textContent = formatTRY(cached.xauTry, 2) + ' / ons';
+      elUpdatedAt.textContent = `Son güncelleme: ${new Date(cached.ts).toLocaleString('tr-TR')} (önbellek)`;
+      elSource.textContent = `Kaynak: ${cached.source || 'önbellek'}`;
+    }
+
+    // Alarm UI
     const a = readAlarm();
     if (a.target) elAlarmTarget.value = a.target;
     elAlarmDirection.value = a.direction || 'ABOVE';
     elAlarmRepeat.checked = a.repeat !== false;
     renderAlarmStatus(a);
+
+    // Portfolio
+    renderTxTable();
+    renderPortfolio();
+
+    // Network + SW
+    setOnlineStatus();
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        // HTTPS veya localhost üzerinde çalışır. Dosyadan açarsanız SW devre dışı kalır.
+        navigator.serviceWorker.register('./sw.js')
+          .then(() => { elSwStatus.textContent = 'PWA aktif'; })
+          .catch(() => { elSwStatus.textContent = 'PWA pasif'; });
+      });
+    } else {
+      elSwStatus.textContent = 'PWA desteklenmiyor';
+    }
+
+    // First fetch + Poll
+    refreshPrice();
+    pollTimer = setInterval(refreshPrice, PRICE_POLL_MS);
   })();
-
-  // Init network status
-  setOnlineStatus();
-
-  // Try load cached price immediately
-  loadLastPriceFromCache();
-
-  // First fetch
-  refreshPrice();
-
-  // Poll
-  pollTimer = setInterval(refreshPrice, PRICE_POLL_MS);
-
-  // Register Service Worker
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(() => {
-          elSwStatus.textContent = 'PWA aktif';
-        })
-        .catch(() => {
-          elSwStatus.textContent = 'PWA pasif';
-        });
-    });
-  } else {
-    elSwStatus.textContent = 'PWA desteklenmiyor';
-  }
 })();

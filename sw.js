@@ -1,19 +1,19 @@
-const CACHE_STATIC = 'altintakip-static-v1';
-const CACHE_RUNTIME = 'altintakip-runtime-v1';
+const CACHE_STATIC = 'altintakip-static-v3';
+const CACHE_RUNTIME = 'altintakip-runtime-v3';
 
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/manifest.webmanifest',
-  '/icons/icon.svg'
+  './',
+  'index.html',
+  'styles.css',
+  'app.js',
+  'manifest.webmanifest',
+  'icons/icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_STATIC);
-    await cache.addAll(STATIC_ASSETS);
+    try { await cache.addAll(STATIC_ASSETS); } catch(e) {}
     self.skipWaiting();
   })());
 });
@@ -33,21 +33,26 @@ self.addEventListener('activate', (event) => {
 });
 
 function isStaticRequest(req) {
-  const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return false;
-  const path = url.pathname;
-  return STATIC_ASSETS.includes(path);
+  try {
+    const url = new URL(req.url);
+    if (url.origin !== self.location.origin) return false;
+    const path = url.pathname.replace(self.location.pathname, '');
+    return STATIC_ASSETS.includes(url.pathname) || STATIC_ASSETS.includes(path) || STATIC_ASSETS.includes(url.pathname.slice(1));
+  } catch {
+    return false;
+  }
 }
 
-function isPriceAPI(req) {
+function isRateAPI(req) {
   const url = new URL(req.url);
   return (
+    url.hostname === 'cdn.jsdelivr.net' ||
     url.hostname.endsWith('exchangerate.host') ||
     url.hostname.endsWith('frankfurter.app')
   );
 }
 
-// Cache-first for static, network-first for price APIs.
+// Cache-first for static, network-first for rates with cache fallback.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -64,7 +69,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (isPriceAPI(req)) {
+  if (isRateAPI(req)) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_RUNTIME);
       try {
