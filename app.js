@@ -43,10 +43,9 @@
   // State
   let lastGramPrice = null;   // TRY/gram
   let lastXauTry = null;      // TRY/ounce
-  let pollTimer = null;
 
   const alarmKey = 'altintakip_alarm';
-  const priceKey = 'altintakip_last_price_v3';
+  const priceKey = 'altintakip_last_price_v4';
   const txKey = 'altintakip_txns_v1';
 
   // Utils
@@ -88,7 +87,7 @@
   }
 
   // Fetch helpers
-  async function fetchJSON(url, timeoutMs = 10000) {
+  async function fetchJSON(url, timeoutMs = 12000) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -100,21 +99,21 @@
     }
   }
 
-  // Primary source: Daily rates via jsDelivr (no API key, wide CORS)
-  async function tryJsDelivrXAUTRY() {
-    const data = await fetchJSON('https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/xau/try.json');
-    const xauTry = data && typeof data['try'] === 'number' ? data['try'] : null;
-    if (!xauTry) throw new Error('jsDelivr yok');
-    return { xauTry, source: 'jsDelivr (günlük)' };
-  }
-
-  // Fallback: exchangerate.host (genelde anahtarsız)
+  // Primary: exchangerate.host XAU -> TRY (anahtarsız)
   async function tryExHostXAUTRY() {
     const d = await fetchJSON('https://api.exchangerate.host/convert?from=XAU&to=TRY');
     if (d && typeof d.result === 'number' && d.result > 0) {
       return { xauTry: d.result, source: 'exchangerate.host' };
     }
     throw new Error('exchangerate.host yok');
+  }
+
+  // Fallback: latest base=XAU
+  async function tryExHostLatest() {
+    const d = await fetchJSON('https://api.exchangerate.host/latest?base=XAU&symbols=TRY');
+    const r = d?.rates?.TRY;
+    if (typeof r === 'number' && r > 0) return { xauTry: r, source: 'exchangerate.host/latest' };
+    throw new Error('exchangerate.host/latest yok');
   }
 
   // Last fallback: XAUUSD * USDTRY
@@ -132,21 +131,22 @@
       usdtry = d3?.rates?.TRY;
     }
     if (!usdtry) throw new Error('USDTRY yok');
-    return { xauTry: xauusd * usdtry, source: 'iki adım (XAUUSD*USDTRY)' };
+    return { xauTry: xauusd * usdtry, source: 'XAUUSD*USDTRY' };
   }
 
   async function getXAU_TRY_Ounce() {
-    const errors = [];
-    for (const fn of [tryJsDelivrXAUTRY, tryExHostXAUTRY, tryTwoStep]) {
-      try { return await fn(); } catch (e) { errors.push(e.message); }
+    const tries = [tryExHostXAUTRY, tryExHostLatest, tryTwoStep];
+    for (const fn of tries) {
+      try { return await fn(); } catch {}
     }
-    throw new Error('Fiyat alınamadı: ' + errors.join(' | '));
+    throw new Error('Fiyat alınamadı');
   }
 
   async function refreshPrice() {
     try {
-      const { xauTry, source } = await getXAU_TRY_Ounce(); // TRY/oz
-      const gramTry = xauTry / GRAMS_PER_TROY_OUNCE; // TRY/gram
+      const { xauTry, source } = await getXAU_TRY_Ounce(); // TRY/ons
+      const gramTry = xauTry / GRAMS_PER_TROY_OUNCE;       // TRY/gram
+
       lastXauTry = xauTry;
       lastGramPrice = gramTry;
 
@@ -156,13 +156,9 @@
       elSource.textContent = `Kaynak: ${source}`;
       document.title = `₺${(gramTry ?? 0).toFixed(2)} • AltınTakip`;
 
-      // Persist
       saveLocal(priceKey, { xauTry, gramTry, source, ts: Date.now() });
 
-      // Update portfolio dependent on price
       renderPortfolio();
-
-      // Alarm check
       runAlarmCheck(gramTry);
     } catch (e) {
       const cached = loadLocal(priceKey);
@@ -179,7 +175,7 @@
         elPrice.textContent = '—';
         elXauTry.textContent = '—';
         elSource.textContent = 'Kaynak: —';
-        toast('Fiyat alınamadı (ağ veya CORS).');
+        toast('Fiyat alınamadı.');
       }
     }
   }
@@ -205,7 +201,6 @@
   }
 
   function calcWAC(transactions) {
-    // transactions: sorted by date asc
     let qty = 0, cost = 0, realized = 0;
     for (const t of transactions) {
       const fee = t.fee || 0;
@@ -243,7 +238,6 @@
       </tr>`;
     }).join('');
     elTxTbody.innerHTML = rows;
-    // Bind delete
     elTxTbody.querySelectorAll('button[data-del]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-del');
@@ -369,31 +363,6 @@
     notify('Test Bildirimi', 'Bildirimler çalışıyor.');
   });
 
-  // Save alarm
-  function alarmTargetInput() {
-    const target = parseFloat(elAlarmTarget.value);
-    if (!Number.isFinite(target) || target <= 0) return null;
-    return target;
-  }
-  elSaveAlarm.addEventListener('click', () => {
-    const target = alarmTargetInput();
-    if (!target) { toast('Geçerli bir hedef fiyat girin'); return; }
-    const a = readAlarm();
-    a.active = true;
-    a.target = target;
-    a.direction = elAlarmDirection.value;
-    a.repeat = !!elAlarmRepeat.checked;
-    a.lastSide = currentSide(lastGramPrice, target);
-    writeAlarm(a);
-    toast('Alarm kaydedildi');
-  });
-  elDisableAlarm.addEventListener('click', () => {
-    const a = readAlarm();
-    a.active = false;
-    writeAlarm(a);
-    toast('Alarm kapatıldı');
-  });
-
   // Trade form actions
   elFillCurrent.addEventListener('click', () => {
     if (lastGramPrice) {
@@ -413,7 +382,6 @@
     if (!Number.isFinite(qty) || qty <= 0) { toast('Geçerli gram miktarı girin'); return; }
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) { toast('Geçerli birim fiyat girin'); return; }
 
-    // SELL kontrol: mevcuttan fazla satma
     const curList = loadTxns().sort((a, b) => a.ts - b.ts);
     const { qty: haveQty } = calcWAC(curList);
     if (type === 'SELL' && qty > haveQty + 1e-9) {
@@ -461,14 +429,6 @@
       elSource.textContent = `Kaynak: ${cached.source || 'önbellek'}`;
     }
 
-    // Alarm UI
-    const a = readAlarm();
-    if (a.target) elAlarmTarget.value = a.target;
-    elAlarmDirection.value = a.direction || 'ABOVE';
-    elAlarmRepeat.checked = a.repeat !== false;
-    renderAlarmStatus(a);
-
-    // Portfolio
     renderTxTable();
     renderPortfolio();
 
@@ -476,8 +436,7 @@
     setOnlineStatus();
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        // HTTPS veya localhost üzerinde çalışır. Dosyadan açarsanız SW devre dışı kalır.
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('sw.js')
           .then(() => { elSwStatus.textContent = 'PWA aktif'; })
           .catch(() => { elSwStatus.textContent = 'PWA pasif'; });
       });
@@ -487,6 +446,6 @@
 
     // First fetch + Poll
     refreshPrice();
-    pollTimer = setInterval(refreshPrice, PRICE_POLL_MS);
+    setInterval(refreshPrice, PRICE_POLL_MS);
   })();
 })();
