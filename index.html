@@ -5,29 +5,40 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>AltınTakip — PWA</title>
   <meta name="theme-color" content="#111827" />
-  <script type="application/manifest+json">
-  {
-    "name": "AltınTakip",
-    "short_name": "AltınTakip",
-    "start_url": "/d-viz/",
-    "scope": "/d-viz/",
-    "display": "standalone",
-    "background_color": "#0B1220",
-    "theme_color": "#FBBF24",
-    "description": "Banka spread’ini dikkate alarak altın işlemlerini takip et, K/Z’ını anlık gör. Offline çalışır.",
-    "icons": [
-      {
-        "src": "/d-viz/icons/icon-192x192.png",
-        "sizes": "192x192",
-        "type": "image/png"
-      },
-      {
-        "src": "/d-viz/icons/icon-512x512.png",
-        "sizes": "512x512",
-        "type": "image/png"
-      }
-    ]
-  }
+   <script>
+    // Manifest içeriği (JSON olarak)
+    const manifest = {
+      "name": "AltınTakip",
+      "short_name": "AltınTakip",
+      "start_url": "/d-viz/",
+      "scope": "/d-viz/",
+      "display": "standalone",
+      "background_color": "#0B1220",
+      "theme_color": "#FBBF24",
+      "description": "Banka spread’ini dikkate alarak altın işlemlerini takip et, K/Z’ını anlık gör. Offline çalışır.",
+      "icons": [
+        {
+          "src": "/d-viz/icons/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        },
+        {
+          "src": "/d-viz/icons/icon-512x512.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    };
+
+    // Manifest için blob oluştur
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    const manifestURL = URL.createObjectURL(blob);
+
+    // Sayfaya manifest linkini dinamik ekle
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = manifestURL;
+    document.head.appendChild(link);
   </script>
   
   <style>
