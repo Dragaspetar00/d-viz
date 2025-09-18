@@ -5,43 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>AltınTakip — PWA</title>
   <meta name="theme-color" content="#111827" />
-  <link rel="shortcut icon" href="https://dummyimage.com/300x300/ffdd00/000000.png&text=Alt%C4%B1n" type="image/x-icon">
-   <script>
-    // Manifest içeriği (JSON olarak)
-    const manifest = {
-      "name": "AltınTakip",
-      "short_name": "AltınTakip",
-      "start_url": "/d-viz/",
-      "scope": "/d-viz/",
-      "display": "standalone",
-      "background_color": "#0B1220",
-      "theme_color": "#FBBF24",
-      "description": "Banka spread’ini dikkate alarak altın işlemlerini takip et, K/Z’ını anlık gör. Offline çalışır.",
-      "icons": [
-        {
-          "src": "https://dummyimage.com/300x300/ffdd00/000000.png&text=Alt%C4%B1n",
-          "sizes": "192x192",
-          "type": "image/png"
-        },
-        {
-          "src": "https://dummyimage.com/300x300/ffdd00/000000.png&text=Alt%C4%B1n",
-          "sizes": "512x512",
-          "type": "image/png"
-        }
-      ]
-    };
-
-    // Manifest için blob oluştur
-    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-    const manifestURL = URL.createObjectURL(blob);
-
-    // Sayfaya manifest linkini dinamik ekle
-    const link = document.createElement('link');
-    link.rel = 'manifest';
-    link.href = manifestURL;
-    document.head.appendChild(link);
-  </script>
-  
+  <link rel="manifest" href="manifest.json" />
   <style>
     :root {
       --bg: #0b1220; --bg-soft: #111827; --card: #0f172a; --text: #e5e7eb; --muted: #9ca3af;
@@ -75,6 +39,8 @@
     .field { display: grid; gap: 6px } .field label { font-size: 12px; color: var(--muted) }
     .input, select, input[type="datetime-local"] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
       background: var(--bg-soft); color: var(--text); outline: none; }
+    .split { display: grid; grid-template-columns: 1fr auto 100px; gap: 6px; align-items: center; }
+    .split .sep { color: var(--muted); font-weight: 700 }
     .pill { display:inline-flex; align-items:center; gap:6px; padding: 6px 10px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 999px; font-size: 12px }
     .flex { display:flex; align-items:center; gap: 8px }
     .space { height: 16px } .divider { height: 1px; background: var(--border); margin: 10px 0 }
@@ -111,7 +77,7 @@
         <div class="headline">Özet</div>
         <div class="grid row-3">
           <div>
-            <div class="muted">Piyasa (TL/g)</div>
+            <div class="muted">Piyasa (tahmini)</div>
             <div class="big num" id="currentMarket">—</div>
             <div class="muted" style="font-size:12px">Spread <span class="num" id="spreadPct">7%</span></div>
           </div>
@@ -141,34 +107,50 @@
         </div>
         <div class="grid row-2" style="margin-top:10px">
           <div class="pill num">Net K/Z: <span id="netPnL" class="num">—</span> <span id="unrealizedPct" class="num muted"></span></div>
-          <div class="pill num">Başabaş Piyasa: <span id="breakEvenMarket">—</span></div>
+          <div class="pill num">Başabaş (Banka Satış): <span id="breakEvenBankSell">—</span></div>
         </div>
         <div class="space"></div>
         <div class="grid row-2">
           <div>
             <div class="field">
-              <label>Banka Alış Fiyatı (TL/g) — manuel güncelle</label>
-              <div class="flex">
-                <input id="priceInput" inputmode="decimal" class="input" placeholder="Örn: 2140 (bankanın ALIŞ)" />
-                <button id="updatePriceBtn" class="btn">Güncelle</button>
+              <label>Banka Fiyatları (TL/g) — manuel gir</label>
+              <div class="grid row-2">
+                <div>
+                  <div class="muted" style="font-size:12px;margin-bottom:4px">ALIŞ</div>
+                  <div class="split">
+                    <input id="bankBuyInt" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="tam">
+                    <span class="sep">.</span>
+                    <input id="bankBuyFrac" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="küsürat (2)">
+                  </div>
+                </div>
+                <div>
+                    <div class="muted" style="font-size:12px;margin-bottom:4px">SATIŞ</div>
+                    <div class="split">
+                      <input id="bankSellInt" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="tam">
+                      <span class="sep">.</span>
+                      <input id="bankSellFrac" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="küsürat (2)">
+                    </div>
+                </div>
               </div>
-              <div class="muted" style="font-size:12px">
-                Not: Buraya bankanın ALIŞ fiyatını yazıyorsun. Sistem piyasa fiyatını spread’e göre otomatik hesaplar.
+              <div class="flex" style="margin-top:8px">
+                <button id="savePriceBtn" class="btn">Güncelle</button>
+                <div class="muted" style="font-size:12px">En az biri doluysa kaydedilir. Piyasa değeri tahmini hesaplanır.</div>
               </div>
             </div>
           </div>
           <div class="grid">
-            <div class="muted" style="font-size:12px">Tüm hesaplar bu yeni değere göre anında yenilenir.</div>
+            <div class="muted" style="font-size:12px">Hesaplar mevcut “banka satış” fiyatına göre yapılır.</div>
             <div class="flex">
               <span class="pill">Toplam Harcama: <b class="num" id="totalSpent">—</b></span>
               <span class="pill">Geri Dönüş: <b class="num" id="totalReturned">—</b></span>
             </div>
           </div>
         </div>
+
         <div class="space"></div>
         <div class="grid row-2">
           <div class="card">
-            <h3>Fiyat Grafiği</h3>
+            <h3>Fiyat Grafiği (Banka Satış)</h3>
             <canvas id="priceCanvas" width="600" height="150"></canvas>
           </div>
           <div class="card">
@@ -182,7 +164,7 @@
         <div class="headline">Öneriler</div>
         <div class="advice" id="adviceList"></div>
         <div class="divider"></div>
-        <div class="muted" style="font-size:12px">Bu basit kurallara dayalı önerilerdir, yatırım tavsiyesi değildir.</div>
+        <div class="muted" style="font-size:12px">Basit kurallar; yatırım tavsiyesi değildir.</div>
       </div>
     </section>
 
@@ -195,6 +177,7 @@
             <button type="button" id="typeBuy" class="btn small">Alış</button>
             <button type="button" id="typeSell" class="btn small secondary">Satış</button>
             <span class="muted" id="typeLabel">Seçili: Alış</span>
+            <button id="fillUnitBtn" class="btn small ghost" type="button">Şu anki fiyatı doldur</button>
           </div>
           <div class="row-2 grid">
             <div class="field">
@@ -203,28 +186,29 @@
             </div>
             <div class="field">
               <label>Gram (g)</label>
-              <input id="gramsInput" inputmode="decimal" class="input" placeholder="Örn: 5" />
+              <div class="split">
+                <input id="gramsInt" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="tam">
+                <span class="sep">.</span>
+                <input id="gramsFrac" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="küsürat (3)">
+              </div>
             </div>
           </div>
           <div class="row-2 grid">
             <div class="field">
-              <label>Birim Fiyat (TL/g) — Alışta bankanın ALIŞ, satışta bankanın SATIŞ fiyatını gir</label>
-              <div class="flex">
-                <input id="unitPriceInput" inputmode="decimal" class="input" placeholder="Örn: 2140 (alış) / 1980 (satış)" />
-                <button id="fillUnitBtn" class="btn small ghost" type="button">Şu anki fiyatı doldur</button>
+              <label>Birim Fiyat (TL/g) — Alışta bankanın ALIŞ, satışta bankanın SATIŞ</label>
+              <div class="split">
+                <input id="unitInt" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="tam">
+                <span class="sep">.</span>
+                <input id="unitFrac" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="küsürat (2)">
               </div>
             </div>
             <div class="field">
-              <label>O anki Piyasa (opsiyonel — butonla otomatik dolar)</label>
-              <input id="marketAtTimeInput" inputmode="decimal" class="input" placeholder="Örn: 2000" />
+              <label>Not (opsiyonel)</label>
+              <input id="noteInput" class="input" placeholder="Örn: Ziraat mobil" />
             </div>
           </div>
-          <div class="field">
-            <label>Not (opsiyonel)</label>
-            <input id="noteInput" class="input" placeholder="Örn: Ziraat mobil" />
-          </div>
           <div class="flex" style="justify-content: space-between;">
-            <div class="muted" style="font-size:12px">Satış eklerken, eldeki gramı aşamazsın (tarihine göre kontrol edilir).</div>
+            <div class="muted" style="font-size:12px">Satış eklerken, eldeki gramı aşamazsın (tarihine göre kontrol).</div>
             <button class="btn" type="submit">Kaydet</button>
           </div>
         </form>
@@ -254,8 +238,12 @@
         <div class="headline">Ayarlar</div>
         <div class="row-2 grid">
           <div class="field">
-            <label>Banka Spread (%)</label>
-            <input id="spreadInput" inputmode="decimal" class="input" value="7" />
+            <label>Spread (%) — sadece tahmini piyasa ve başabaş piyasa için</label>
+            <div class="split">
+              <input id="spreadInt" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="tam">
+              <span class="sep">.</span>
+              <input id="spreadFrac" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="küsürat (2)">
+            </div>
           </div>
           <div class="field">
             <label>Tema</label>
@@ -277,9 +265,9 @@
       <div class="card">
         <div class="headline">Bilgi</div>
         <div class="grid">
-          <div class="muted">• Bu uygulama PWA’dır; ana ekrana ekleyip offline kullanabilirsin.</div>
-          <div class="muted">• Verilerin sadece cihazındadır (localStorage).</div>
-          <div class="muted">• “G” logosu temsili. Bu bir yatırım tavsiyesi değildir.</div>
+          <div class="muted">• PWA — ana ekrana ekle, offline çalışır.</div>
+          <div class="muted">• Verilerin cihazında (localStorage).</div>
+          <div class="muted">• Bu bir yatırım tavsiyesi değildir.</div>
         </div>
       </div>
     </section>
@@ -288,49 +276,75 @@
   <footer>© <span id="year"></span> AltınTakip</footer>
 
   <script>
-    // ------------- Utilities
+    // ---------- Utils
     const qs = s => document.querySelector(s);
     const qsa = s => Array.from(document.querySelectorAll(s));
-    const toISO = d => new Date(d).toISOString();
-    const parseNum = v => {
-      if (typeof v === 'number') return v;
-      if (!v) return NaN;
-      return parseFloat(String(v).replace(/\./g,'').replace(',', '.'));
-    };
+    const parseDigits = s => (s ?? '').replace(/\D/g,'');
     const fmtTL = n => (n == null || isNaN(n)) ? '—' : n.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 });
     const fmtNum = n => (n == null || isNaN(n)) ? '—' : n.toLocaleString('tr-TR', { maximumFractionDigits: 4 });
     const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
     const dtLocalValue = (d=new Date()) => {
       const pad = x => String(x).padStart(2,'0');
-      const yy = d.getFullYear();
-      const mm = pad(d.getMonth()+1);
-      const dd = pad(d.getDate());
-      const hh = pad(d.getHours());
-      const mi = pad(d.getMinutes());
+      const yy = d.getFullYear(), mm = pad(d.getMonth()+1), dd = pad(d.getDate());
+      const hh = pad(d.getHours()), mi = pad(d.getMinutes());
       return `${yy}-${mm}-${dd}T${hh}:${mi}`;
     };
 
-    // ------------- Storage
+    // split helpers
+    function setupSplit(prefix, decimals) {
+      const i = qs('#'+prefix+'Int'), f = qs('#'+prefix+'Frac');
+      const onInput = () => {
+        i.value = parseDigits(i.value);
+        f.value = parseDigits(f.value).slice(0, decimals);
+      };
+      i.addEventListener('input', onInput);
+      f.addEventListener('input', onInput);
+      onInput();
+    }
+    function hasSplit(prefix) {
+      const i = qs('#'+prefix+'Int')?.value, f = qs('#'+prefix+'Frac')?.value;
+      return parseDigits(i).length > 0 || parseDigits(f).length > 0;
+    }
+    function getSplit(prefix, decimals) {
+      const i = parseDigits(qs('#'+prefix+'Int')?.value);
+      const f = parseDigits(qs('#'+prefix+'Frac')?.value).slice(0, decimals);
+      const iv = i ? parseInt(i,10) : 0;
+      const fv = f ? parseInt(f,10) : 0;
+      return iv + fv / Math.pow(10, decimals);
+    }
+    function setSplit(prefix, value, decimals) {
+      const v = Number(value);
+      if (!(v >= 0)) { qs('#'+prefix+'Int').value = ''; qs('#'+prefix+'Frac').value = ''; return; }
+      const iv = Math.floor(v);
+      let fv = Math.round((v - iv) * Math.pow(10, decimals));
+      if (fv === Math.pow(10, decimals)) { // handle 1.999 -> 2.00
+        qs('#'+prefix+'Int').value = String(iv + 1);
+        qs('#'+prefix+'Frac').value = ''.padStart(decimals, '0');
+      } else {
+        qs('#'+prefix+'Int').value = String(iv);
+        qs('#'+prefix+'Frac').value = String(fv).padStart(decimals, '0');
+      }
+    }
+
+    // ---------- Storage
     const LS_KEYS = { tx: 'altintakip_transactions', prices: 'altintakip_prices', settings: 'altintakip_settings' };
     const load = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def } catch(e){ return def } };
     const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
     let transactions = load(LS_KEYS.tx, []);
-    let prices = load(LS_KEYS.prices, []); // {id,date,marketPrice}
+    // prices item: {id, date, bankBuy?, bankSell?, marketPrice?}
+    let prices = load(LS_KEYS.prices, []);
     let settings = load(LS_KEYS.settings, { spread: 0.07, theme: 'system' });
 
-    // ------------- Theme
+    // ---------- Theme
     function applyTheme() {
       let t = settings.theme;
-      if (t === 'system') {
-        const mq = window.matchMedia('(prefers-color-scheme: dark)');
-        t = mq.matches ? 'dark' : 'light';
-      }
+      if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', t);
     }
     applyTheme();
 
-    // ------------- Finance core
+    // ---------- Finance
     function sortByDateAsc(a,b){ return new Date(a.date) - new Date(b.date) || (a.id||'').localeCompare(b.id||'') }
     function sortByDateDesc(a,b){ return new Date(b.date) - new Date(a.date) || (b.id||'').localeCompare(a.id||'') }
 
@@ -359,32 +373,38 @@
       return h;
     }
 
-    function getCurrentMarket() {
-      if (!prices.length) return null;
-      const last = [...prices].sort(sortByDateAsc).at(-1);
-      return last?.marketPrice ?? null;
+    function latestPrices(spread) {
+      const arr = [...prices].sort(sortByDateAsc);
+      let bb = null, bs = null, mk = null;
+      for (const p of arr) {
+        if (p.bankBuy != null) bb = p.bankBuy;
+        if (p.bankSell != null) bs = p.bankSell;
+        if (p.marketPrice != null) mk = p.marketPrice;
+      }
+      let market = mk;
+      if (market == null && bb != null) market = bb / (1 + spread);
+      if (market == null && bs != null) market = bs / (1 - spread);
+      if (bb == null && market != null) bb = market * (1 + spread);
+      if (bs == null && market != null) bs = market * (1 - spread);
+      return { bankBuy: bb, bankSell: bs, market };
     }
 
     function computeAll() {
       const { holdings, avgCost, realizedPnL, totalSpent, totalReturned } = recomputePortfolio(transactions);
-      const currentMarket = getCurrentMarket();
       const spread = settings.spread ?? 0.07;
-      const bankBuy = currentMarket != null ? currentMarket * (1 + spread) : null;
-      const bankSell = currentMarket != null ? currentMarket * (1 - spread) : null;
+      const { bankBuy, bankSell, market: currentMarket } = latestPrices(spread);
+
       const portfolioValue = (bankSell != null) ? holdings * bankSell : null;
       const unrealizedPnL = (bankSell != null) ? (bankSell - avgCost) * holdings : null;
       const netPnL = (unrealizedPnL != null) ? (realizedPnL + unrealizedPnL) : realizedPnL;
       const unrealizedPct = (bankSell != null && avgCost > 0 && holdings > 0) ? ((bankSell - avgCost) / avgCost) * 100 : null;
-      const breakEvenMarket = avgCost > 0 ? avgCost / (1 - spread) : null;
+      const breakEvenBankSell = avgCost > 0 ? avgCost : null;
 
-      // Series for charts
-      const priceEvents = [
-        ...prices.map(p => ({ kind:'price', date:p.date, market:p.marketPrice, id:p.id })),
-        ...transactions.filter(t => t.marketPriceAtTime).map(t => ({ kind:'price', date: t.date, market: t.marketPriceAtTime, id:t.id+'p' }))
-      ].sort(sortByDateAsc);
-
-      const events = [ ...transactions.map(t => ({ kind:'tx', ...t })), ...priceEvents ]
-        .sort((a,b) => new Date(a.date) - new Date(b.date) || (a.kind === 'tx' ? -1 : 1));
+      // Series
+      const events = [
+        ...transactions.map(t => ({ kind:'tx', ...t })),
+        ...prices.map(p => ({ kind:'price', ...p }))
+      ].sort((a,b) => new Date(a.date) - new Date(b.date) || (a.kind === 'tx' ? -1 : 1));
 
       let h=0, ac=0;
       const priceSeries = [], valueSeries = [];
@@ -393,49 +413,51 @@
           if (ev.type === 'buy') {
             const tot = ac * h + ev.unitPriceBank * ev.grams;
             h += ev.grams; ac = h>0 ? tot/h : 0;
-          } else { const g = Math.min(ev.grams, h); h -= g; }
+          } else {
+            const g = Math.min(ev.grams, h); h -= g;
+          }
         } else {
-          const bankSellEv = ev.market * (1 - spread);
-          priceSeries.push({ x: new Date(ev.date), y: ev.market });
-          valueSeries.push({ x: new Date(ev.date), y: h * bankSellEv });
+          // tercih: bankSell varsa onu çiz, yoksa bankBuy, o da yoksa market
+          const ps = (ev.bankSell != null) ? ev.bankSell : (ev.bankBuy != null ? ev.bankBuy : (ev.marketPrice != null ? ev.marketPrice : null));
+          if (ps != null) {
+            priceSeries.push({ x: new Date(ev.date), y: ps });
+            // değerleme için bankanın satışını tercih et
+            const useSell = (ev.bankSell != null) ? ev.bankSell : (ev.marketPrice != null ? ev.marketPrice * (1 - spread) : (ev.bankBuy != null ? ev.bankBuy : null));
+            if (useSell != null) valueSeries.push({ x: new Date(ev.date), y: h * useSell });
+          }
         }
       }
 
       return {
         holdings, avgCost, realizedPnL, totalSpent, totalReturned,
         currentMarket, bankBuy, bankSell,
-        portfolioValue, unrealizedPnL, netPnL, unrealizedPct, breakEvenMarket,
+        portfolioValue, unrealizedPnL, netPnL, unrealizedPct, breakEvenBankSell,
         series: { priceSeries, valueSeries }
       };
     }
 
     function buildAdvice(state) {
       const tips = [];
-      const { holdings, avgCost, currentMarket } = state;
-      const spread = settings.spread ?? 0.07;
-      if (!currentMarket) {
-        tips.push('Banka alış girilmedi. Üstte “Banka Alış Fiyatı” alanından güncelle.');
-        return tips;
-      }
-      const bankSell = currentMarket * (1 - spread);
-      if (holdings <= 0) { tips.push('Pozisyonun yok. Fiyatı izleyip uygun gördüğünde alış ekleyebilirsin.'); return tips; }
+      const { holdings, avgCost, bankSell } = state;
+      if (bankSell == null) { tips.push('Banka satış girilmedi. Üstten fiyat güncelle.'); return tips; }
+      if (holdings <= 0) { tips.push('Pozisyonun yok. Uygun gördüğünde alış ekleyebilirsin.'); return tips; }
       const gainPct = avgCost>0 ? (bankSell - avgCost) / avgCost : 0;
       if (gainPct >= 0.03) tips.push('Kâr %3 üzeri — satmayı düşünebilirsin.');
       else if (gainPct <= -0.03) tips.push('Maliyetinin altında — beklemek mantıklı olabilir.');
-      tips.push(`Başabaş piyasa: ${fmtNum(avgCost/(1-spread))} TL/g`);
-      const futureMarket = currentMarket * 0.9;
-      const futureSell = futureMarket * (1 - spread);
+      tips.push(`Başabaş (Banka Satış): ${fmtTL(avgCost)} TL/g`);
+      // %10 düşüş senaryosu (banka satış)
+      const futureSell = bankSell * 0.9;
       const futureValue = holdings * futureSell;
       tips.push(`%10 düşüşte portföy değeri: ${fmtTL(futureValue)}`);
       return tips;
     }
 
-    // ------------- Rendering
+    // ---------- Render
     function setText(id, txt, cls) {
       const el = qs('#'+id); if (!el) return;
-      el.textContent = txt; if (cls) { el.classList.remove('ok','bad'); el.classList.add(cls); }
+      el.textContent = txt;
+      if (cls) { el.classList.remove('ok','bad'); el.classList.add(cls); }
     }
-
     function drawSpark(canvas, data, color) {
       const ctx = canvas.getContext('2d');
       const w = canvas.width, h = canvas.height;
@@ -465,15 +487,18 @@
       save(LS_KEYS.prices, prices);
       save(LS_KEYS.settings, settings);
 
+      // spread split set
+      setText('spreadPct', `${Math.round((settings.spread ?? 0.07)*100)}%`);
+      setSplit('spread', (settings.spread ?? 0.07)*100, 2);
+
       const state = computeAll();
       const {
         holdings, avgCost, realizedPnL, totalSpent, totalReturned,
         currentMarket, bankBuy, bankSell,
-        portfolioValue, unrealizedPnL, netPnL, unrealizedPct, breakEvenMarket,
+        portfolioValue, netPnL, unrealizedPct, breakEvenBankSell,
         series
       } = state;
 
-      setText('spreadPct', `${Math.round((settings.spread ?? 0.07)*100)}%`);
       setText('currentMarket', currentMarket!=null ? fmtTL(currentMarket) : '—');
       setText('bankBuy', bankBuy!=null ? fmtTL(bankBuy) : '—');
       setText('bankSell', bankSell!=null ? fmtTL(bankSell) : '—');
@@ -485,7 +510,7 @@
       const pnlCls = netPnL>0 ? 'ok' : (netPnL<0 ? 'bad' : undefined);
       setText('netPnL', netPnL!=null ? fmtTL(netPnL) : '—', pnlCls);
       setText('unrealizedPct', unrealizedPct!=null ? `(${unrealizedPct.toFixed(2)}%)` : '');
-      setText('breakEvenMarket', breakEvenMarket!=null ? fmtTL(breakEvenMarket) : '—');
+      setText('breakEvenBankSell', breakEvenBankSell!=null ? fmtTL(breakEvenBankSell) : '—');
 
       setText('totalSpent', fmtTL(totalSpent));
       setText('totalReturned', fmtTL(totalReturned));
@@ -525,51 +550,48 @@
       drawSpark(qs('#valueCanvas'), series.valueSeries, getComputedStyle(document.body).getPropertyValue('--green').trim());
     }
 
-    // ------------- Events
-    // price update (input = BANK BUY)
-    qs('#updatePriceBtn').addEventListener('click', () => {
-      const bankBuyInput = parseNum(qs('#priceInput').value);
-      if (!isFinite(bankBuyInput) || bankBuyInput <= 0) { alert('Geçerli banka ALIŞ fiyatı giriniz'); return; }
-      const spread = settings.spread ?? 0.07;
-      const market = bankBuyInput / (1 + spread); // bankanın alışından piyasa hesapla
-      prices.push({ id: uid(), date: new Date().toISOString(), marketPrice: market });
-      qs('#priceInput').value = '';
+    // ---------- Events
+    // split setups
+    setupSplit('bankBuy', 2);
+    setupSplit('bankSell', 2);
+    setupSplit('grams', 3);
+    setupSplit('unit', 2);
+    setupSplit('spread', 2);
+
+    // price update: save manual bank buy/sell
+    qs('#savePriceBtn').addEventListener('click', () => {
+      const hasBB = hasSplit('bankBuy');
+      const hasBS = hasSplit('bankSell');
+      if (!hasBB && !hasBS) { alert('En az ALIŞ veya SATIŞ değeri giriniz'); return; }
+      const p = { id: uid(), date: new Date().toISOString() };
+      if (hasBB) p.bankBuy = getSplit('bankBuy', 2);
+      if (hasBS) p.bankSell = getSplit('bankSell', 2);
+      prices.push(p);
+      // clear inputs
+      setSplit('bankBuy', NaN, 2);
+      setSplit('bankSell', NaN, 2);
       render();
     });
 
-    // quick action buttons
+    // quick action + type toggle
     let currentType = 'buy';
     function setType(t) {
       currentType = t;
       qs('#typeLabel').textContent = 'Seçili: ' + (t==='buy'?'Alış':'Satış');
       qs('#typeBuy').className = 'btn small' + (t==='buy'?'':' secondary');
       qs('#typeSell').className = 'btn small' + (t==='sell'?'':' secondary');
-      // input boşsa otomatik doldur
-      if (!qs('#unitPriceInput').value) prefillUnitPrice();
     }
-
-    function prefillUnitPrice() {
-      const state = computeAll();
-      if (state.currentMarket == null) {
-        return; // önce banka alış girilmeli
-      }
-      const price = currentType==='buy' ? state.bankBuy : state.bankSell;
-      if (price != null) qs('#unitPriceInput').value = price.toFixed(2);
-      if (state.currentMarket != null) qs('#marketAtTimeInput').value = state.currentMarket.toFixed(2);
-    }
-
     qs('#typeBuy').addEventListener('click', ()=>setType('buy'));
     qs('#typeSell').addEventListener('click', ()=>setType('sell'));
     qs('#quick-buy').addEventListener('click', ()=>{ setType('buy'); window.scrollTo({ top: document.body.scrollHeight/3, behavior:'smooth' }); });
     qs('#quick-sell').addEventListener('click', ()=>{ setType('sell'); window.scrollTo({ top: document.body.scrollHeight/3, behavior:'smooth' }); });
 
-    // "Şu anki fiyatı doldur" butonu
+    // fill current unit price from latest bank buy/sell
     qs('#fillUnitBtn').addEventListener('click', () => {
-      const state = computeAll();
-      if (state.currentMarket == null) { alert('Önce üstten bankanın ALIŞ fiyatını gir.'); return; }
-      const price = currentType==='buy' ? state.bankBuy : state.bankSell;
-      qs('#unitPriceInput').value = price.toFixed(2);
-      qs('#marketAtTimeInput').value = state.currentMarket.toFixed(2);
+      const { bankBuy, bankSell } = latestPrices(settings.spread ?? 0.07);
+      const v = currentType==='buy' ? bankBuy : bankSell;
+      if (v == null) { alert('Önce üstten ilgili banka fiyatını gir.'); return; }
+      setSplit('unit', v, 2);
     });
 
     // tx form defaults
@@ -580,13 +602,12 @@
     qs('#txForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const date = qs('#dateInput').value ? new Date(qs('#dateInput').value) : new Date();
-      const grams = parseNum(qs('#gramsInput').value);
-      const unitPrice = parseNum(qs('#unitPriceInput').value);
-      const mktAt = parseNum(qs('#marketAtTimeInput').value);
+      const grams = getSplit('grams', 3);
+      const unitPrice = getSplit('unit', 2);
       const note = qs('#noteInput').value?.trim() || undefined;
 
-      if (!isFinite(grams) || grams <= 0) return alert('Geçerli gram giriniz');
-      if (!isFinite(unitPrice) || unitPrice <= 0) return alert('Geçerli birim fiyat giriniz');
+      if (!(grams > 0)) return alert('Geçerli gram giriniz');
+      if (!(unitPrice > 0)) return alert('Geçerli birim fiyat giriniz');
 
       // satış validasyon - tarihe kadar eldeki gram
       if (currentType === 'sell') {
@@ -600,46 +621,32 @@
         type: currentType,
         grams,
         unitPriceBank: unitPrice, // alış: bankanın alış, satış: bankanın satış
-        marketPriceAtTime: isFinite(mktAt) ? mktAt : undefined,
         note
       };
       transactions.push(tx);
 
-      // opsiyonel piyasa girdiyse, fiyat geçmişine ekleyelim
-      if (isFinite(mktAt)) prices.push({ id: uid(), date: tx.date, marketPrice: mktAt });
-
       // reset
-      qs('#gramsInput').value = '';
-      qs('#unitPriceInput').value = '';
-      qs('#marketAtTimeInput').value = '';
+      setSplit('grams', NaN, 3);
+      setSplit('unit', NaN, 2);
       qs('#noteInput').value = '';
       qs('#dateInput').value = dtLocalValue(new Date());
       render();
     });
 
-    // settings
-    const spreadInput = qs('#spreadInput');
-    spreadInput.value = (settings.spread*100).toString();
-    spreadInput.addEventListener('change', () => {
-      const v = parseNum(spreadInput.value);
-      if (!isFinite(v) || v<0 || v>50) return alert('0-50 arası bir yüzde giriniz');
-      settings.spread = v/100;
-      render();
-    });
-
+    // settings: spread split
     const themeSelect = qs('#themeSelect');
     themeSelect.value = settings.theme ?? 'system';
     themeSelect.addEventListener('change', () => {
       settings.theme = themeSelect.value; applyTheme(); render();
     });
-
-    qs('#themeBtn').addEventListener('click', () => {
-      const order = ['system','light','dark'];
-      const idx = order.indexOf(settings.theme ?? 'system');
-      settings.theme = order[(idx+1)%order.length];
-      themeSelect.value = settings.theme;
-      applyTheme(); render();
-    });
+    function saveSpreadFromSplit() {
+      const v = getSplit('spread', 2); // örn 7.50
+      if (!(v >= 0) || v > 50) { alert('Spread %0 - %50 arası olmalı'); setSplit('spread', (settings.spread ?? 0.07)*100, 2); return; }
+      settings.spread = v / 100; render();
+    }
+    // kaydet spread değişince
+    qs('#spreadInt').addEventListener('change', saveSpreadFromSplit);
+    qs('#spreadFrac').addEventListener('change', saveSpreadFromSplit);
 
     // export/import/clear
     qs('#exportBtn').addEventListener('click', () => {
@@ -666,7 +673,7 @@
     });
     qs('#clearBtn').addEventListener('click', () => {
       if (!confirm('Tüm verileri silmek istediğine emin misin?')) return;
-      transactions = []; prices = []; settings = { spread: 0.06, theme: 'system' };
+      transactions = []; prices = []; settings = { spread: 0.07, theme: 'system' };
       applyTheme(); render();
     });
 
@@ -676,7 +683,7 @@
     // first render
     render();
 
-    // ------------- PWA: Service Worker register (localhost/https)
+    // PWA SW
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(console.error);
